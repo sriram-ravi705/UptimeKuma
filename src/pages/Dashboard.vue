@@ -7,6 +7,10 @@
                         <font-awesome-icon icon="plus" />
                         {{ $t("Add New Monitor") }}
                     </router-link>
+                    <router-link to="/import" class="btn btn-normal mb-3 ms-2">
+                        <font-awesome-icon icon="upload" />
+                        Import
+                    </router-link>
                 </div>
                 <MonitorList :scrollbar="true" />
             </div>
