@@ -4,7 +4,147 @@
 
 # Uptime Kuma
 
+> [!IMPORTANT]
+> **This is a customised copy of Uptime Kuma 2.5.12 with a bulk Import feature.**
+> Read [About this version](#about-this-version-bulk-import) below before installing or updating.
+> Do **not** run `npm run setup`: it switches back to the official version and removes the Import feature.
+
 Uptime Kuma is an easy-to-use self-hosted monitoring tool.
+
+## About this version (bulk import)
+
+This repository is the official [Uptime Kuma](https://github.com/louislam/uptime-kuma) **2.5.12**
+plus one change: an **Import** button next to **+ Add New Monitor** that adds many websites at once
+from an Excel (`.xlsx`) or CSV file.
+
+- **Download Excel template**: made from your Uptime Kuma, with your notification names as a dropdown and a "How to fill" sheet
+- **Preview** before anything is added: each row is marked New, Already in Uptime Kuma, Duplicate in file, or Invalid (with the reason)
+- Each row becomes an HTTP(s) monitor that alerts when the site goes **down**, and optionally before its **SSL certificate** or **domain** expires
+- Sites that already exist are skipped, so the same file can be uploaded again after adding rows
+
+Changed files (everything else is official 2.5.12): `src/pages/BulkImport.vue` (new), `src/util-bulk-import.js` (new),
+`src/pages/Dashboard.vue`, `src/router.js`, `src/icon.js`. No new dependencies.
+
+### Requirements
+
+- Linux server (tested on Amazon Linux 2023) or macOS
+- **Node.js 20 or 22** (not newer). Install with [nvm](https://github.com/nvm-sh/nvm): `nvm install 22`
+- `git`
+- At least 1 GB RAM. Building the web page needs about 1.5 GB, so on a 1 GB server either add swap or build on another machine (see step 3)
+
+### Install (after cloning)
+
+```bash
+# 1. Get the code
+git clone https://github.com/sriram-ravi705/UptimeKuma.git
+cd UptimeKuma
+
+# 2. Install the dependencies needed to run it
+npm ci --omit dev
+```
+
+**3. Build the web page.** The built page (`dist/`) is not stored in git, and this version cannot use the
+official pre-built page. Choose one:
+
+- **A. Build on the server** (needs ~1.5 GB RAM, or swap):
+
+  ```bash
+  npm ci                 # also installs the build tools
+  npm run build          # creates dist/  (a few minutes)
+  npm ci --omit dev      # remove the build tools again
+  ```
+
+- **B. Build on your computer and copy it** (best for small servers). On your computer, in your clone of this repo:
+
+  ```bash
+  npm ci && npm run build
+  scp -r dist <user>@<server>:<path-to>/UptimeKuma/
+  ```
+
+```bash
+# 4. Check the database driver works (should print a version like 3.41.1)
+node -e 'const s=require("@louislam/sqlite3"); new s.Database(":memory:").get("select sqlite_version() v",(e,r)=>console.log(e?e.message:r.v))'
+#    If it says "Cannot find module ... node_sqlite3.node", run:  npm ci --omit dev   again
+
+# 5. Start it with PM2 and make it start on boot
+npm install -g pm2
+pm2 start server/server.js --name uptime-kuma --max-memory-restart 400M
+pm2 save
+pm2 startup            # run the command it prints (if any)
+```
+
+**6. Open `http://<server-ip>:3001`** (allow port 3001 in your firewall / AWS security group), then:
+
+1. Choose **SQLite** and create the admin account. Keep the password safe: there is no "forgot password".
+2. **Settings → Notifications → Setup Notification**: add your alert channel (e.g. Microsoft Teams), tick **Default enabled**, click **Test**, **Save**.
+3. On the same page set **TLS Certificate Expiry** days (e.g. 30 and 7) and **Save**.
+4. **Settings → Monitor History**: keep history for e.g. **90** days.
+5. Click **Import** → **Download Excel template**, fill in the **Domains** sheet, upload it, check the preview, **Import**.
+
+### Where your data is
+
+Everything (admin account, monitors, notifications, history) is in the **`data/`** folder inside this directory.
+It is not in git. **Back it up before any update, move or re-install:**
+
+```bash
+pm2 stop uptime-kuma
+cp -r data ~/kuma-backup-$(date +%F)
+pm2 start uptime-kuma
+```
+
+> [!WARNING]
+> Never delete this folder to "re-clone" it: that deletes `data/` and all your monitors with it.
+> To get new code, use `git pull` (below).
+
+### Update to a newer commit of this repository
+
+```bash
+cd UptimeKuma
+cp -r data ~/kuma-backup-$(date +%F)      # backup first
+git pull
+npm ci --omit dev
+# rebuild dist/ (step 3, option A or B)
+pm2 restart uptime-kuma
+```
+
+### Roll back to official Uptime Kuma
+
+Your data stays as it is (this version does not change the database).
+
+```bash
+git fetch https://github.com/louislam/uptime-kuma.git tag 2.5.12
+git checkout 2.5.12
+npm ci --omit dev && npm run download-dist
+pm2 restart uptime-kuma
+```
+
+### Useful commands
+
+| What | Command |
+|---|---|
+| Status | `pm2 status` |
+| Logs | `pm2 logs uptime-kuma` |
+| Restart | `pm2 restart uptime-kuma` |
+| Stop | `pm2 stop uptime-kuma` |
+
+### Import file columns
+
+Only `url` is required; empty cells use the defaults shown on the Import page.
+
+| Column | What to put |
+|---|---|
+| `url` | Website address. `https://` is added if missing |
+| `name` | Name shown in alerts. Empty = the domain |
+| `description` | Owner or notes |
+| `notifications` | Notification name(s) from Uptime Kuma, comma separated. `none` = no alerts |
+| `interval` | Seconds between checks, 20–86400 (recommended 60) |
+| `retries` | Failed checks before a Down alert, 0–10 (recommended 2) |
+| `ssl_alert` | `yes` / `no`: warn before the SSL certificate expires |
+| `domain_alert` | `yes` / `no`: warn before the domain registration expires |
+
+> [!NOTE]
+> This change is for this repository only. Do not open a pull request with it to the official
+> Uptime Kuma project. The rest of this README is the official Uptime Kuma README.
 
 <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/stars/louislam/uptime-kuma?style=flat" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/pulls/louislam/uptime-kuma" /></a> <a target="_blank" href="https://hub.docker.com/r/louislam/uptime-kuma"><img src="https://img.shields.io/docker/v/louislam/uptime-kuma/2?label=docker%20image%20ver." /></a> <a target="_blank" href="https://github.com/louislam/uptime-kuma"><img src="https://img.shields.io/github/last-commit/louislam/uptime-kuma" /></a> <a target="_blank" href="https://opencollective.com/uptime-kuma"><img src="https://opencollective.com/uptime-kuma/total/badge.svg?label=Open%20Collective%20Backers&color=brightgreen" /></a>
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/louislam?label=GitHub%20Sponsors)](https://github.com/sponsors/louislam) <a href="https://weblate.kuma.pet/projects/uptime-kuma/uptime-kuma/">
